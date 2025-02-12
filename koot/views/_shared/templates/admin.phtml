@@ -7,10 +7,10 @@
   <link rel="stylesheet" href="/css/koot.min.css?<?= filemtime('css/koot.min.css') ?>">
 </head>
 <body>
-<div class="container-fluid grid">   
+<div class="container-fluid grid">
 <main class="grid" id="develop">
   <aside id="menu">
-  <nav>
+  <nav aria-label="Main Navigation">
     <ul>
       <li>
         <a href="/admin/users">
@@ -24,7 +24,7 @@
   </nav>
 </aside>
 <div id="doc">
-  <nav>
+  <nav aria-label="App Info">
       <ul>
       <li>App: <strong>Koot</strong><br><small><?= PRODUCTION ? 'Production' : 'Development' ?></small></li>
       </ul>
