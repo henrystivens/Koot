@@ -20,7 +20,7 @@
  */
 return [
     'default' => [
-        'dsn' => 'sqlite:'.APP_PATH.'temp/sqlite/ku_admin.db',
+        'dsn' => 'sqlite:'.APP_PATH.'temp/sqlite/koot.db',
         'pdo' => 'On',
     ]
 ];
