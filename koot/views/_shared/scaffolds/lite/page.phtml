@@ -4,7 +4,7 @@
     <div class="actions">
         <?= Html::linkAction("create/", _('Create'), 'role="button"') ?>
     </div>
-    <?php if (!isset($data) && (count($data) < 1)) : ?>
+    <?php if (!isset($data) || count($data) < 1) : ?>
         <h2><?= _('No records') ?></h2>
 </div>
 <?php return 1;
