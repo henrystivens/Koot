@@ -49,6 +49,17 @@ class ModelLiteForm
     protected static array $dateTimeTypes = ['datetime', 'timestamp'];
 
     /**
+     * Escapes a string for safe HTML output.
+     *
+     * @param string $value The string to escape.
+     * @return string The escaped string.
+     */
+    private static function escape(string $value): string
+    {
+        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    /**
      * Generates an HTML form for a given model.
      *
      * @param LiteRecord $model The model object for which the form is being created.
@@ -63,18 +74,14 @@ class ModelLiteForm
             $action = ltrim(Router::get('route'), '/');
         }
 
-        // Get the primary key
+        // Get the primary key and its value if set
         $pk = $model_name::getPK();
-        $pkValue = htmlspecialchars(
-            $model->$pk,
-            ENT_QUOTES | ENT_SUBSTITUTE,
-            'UTF-8'
-        );
+        $pkValue = isset($model->$pk) ? self::escape($model->$pk) : '';
 
         echo '<form action="', PUBLIC_PATH, $action, '" method="post" id="', $model_name, '" class="scaffold">' . PHP_EOL;
 
         if ($pkValue) {
-            echo '<input id="' , $model_name , '_' , $pk, '" name="' , $model_name , '[', $pk . ']" value="', $pkValue, '" type="hidden">' . PHP_EOL;
+            echo '<input id="', $model_name, '_', $pk, '" name="', $model_name, '[', $pk, ']" value="', $pkValue, '" type="hidden">' . PHP_EOL;
         }
 
         // Get the fields
@@ -97,21 +104,20 @@ class ModelLiteForm
 
             echo "<label {$labelClass}>{$alias}{$asterisk}" . PHP_EOL;
 
-            $value = htmlspecialchars(
-                $model->$field,
-                ENT_QUOTES | ENT_SUBSTITUTE,
-                'UTF-8'
-            );
+            // Use isset to check if the property exists, otherwise use an empty string.
+            $value = isset($model->$field) ? self::escape($model->$field) : '';
 
             if (str_ends_with($field, '_id')) {
+                $fieldValue = isset($model->$field) ? $model->$field : '';
                 echo Form::dbSelect(
                     "{$model_name}.{$field}",
                     null,
                     null,
                     'Select',
                     '',
-                    $model->$field
+                    $fieldValue
                 );
+                echo '</label>', PHP_EOL;
                 continue;
             }
 
@@ -157,8 +163,7 @@ class ModelLiteForm
         string $inputId,
         string $inputName,
         string $requiredAttr
-    ): string
-    {
+    ): string {
         if (in_array($type, static::$numberTypes, true)) {
             $input = self::buildInputElement(
                 'number',
@@ -240,8 +245,7 @@ class ModelLiteForm
         string $name,
         string $value = '',
         string $requiredAttr = ''
-    ): string
-    {
+    ): string {
         $attributesString = self::attributesToString([
             'id' => $id,
             'name' => $name,
@@ -267,8 +271,7 @@ class ModelLiteForm
         string $name,
         string $requiredAttr = '',
         string $content = ''
-    ): string
-    {
+    ): string {
         $attributesString = self::attributesToString([
             'id' => $id,
             'name' => $name,
@@ -290,11 +293,10 @@ class ModelLiteForm
     private static function buildSelectElement(
         string $id,
         string $name,
-        array  $options,
+        array $options,
         string $selectedValue,
         string $requiredAttr
-    ): string
-    {
+    ): string {
         $attributesString = self::attributesToString([
             'id' => $id,
             'name' => $name,
@@ -303,14 +305,8 @@ class ModelLiteForm
         $selectHtml = "<select {$attributesString}>" . PHP_EOL;
         foreach ($options as $option) {
             $selected = $option === $selectedValue ? ' selected' : '';
-            $optionEscaped = htmlspecialchars(
-                $option,
-                ENT_QUOTES | ENT_SUBSTITUTE,
-                'UTF-8'
-            );
-            $selectHtml .=
-                "<option value=\"{$optionEscaped}\"{$selected}>{$optionEscaped}</option>" .
-                PHP_EOL;
+            $optionEscaped = self::escape($option);
+            $selectHtml .= "<option value=\"{$optionEscaped}\"{$selected}>{$optionEscaped}</option>" . PHP_EOL;
         }
         $selectHtml .= '</select>';
         return $selectHtml;
@@ -329,11 +325,7 @@ class ModelLiteForm
                 if ($value === '' || is_int($key)) {
                     return '';
                 }
-                $escapedValue = htmlspecialchars(
-                    $value,
-                    ENT_QUOTES | ENT_SUBSTITUTE,
-                    'UTF-8'
-                );
+                $escapedValue = self::escape($value);
                 return "{$key}=\"{$escapedValue}\"";
             },
             array_keys($attributes),
