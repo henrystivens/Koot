@@ -1,12 +1,23 @@
 <?php
 
 /**
- * Utility class for generating HTML forms for given LiteRecord models.
+ * Class ModelLiteForm
+ *
+ * Utility class to generate HTML forms from LiteRecord models.
+ *
+ * This implementation follows clean architecture principles by isolating concerns:
+ * - Form rendering is separated into small, reusable helper methods.
+ * - Repetitive tasks (e.g. HTML escaping, attribute string building) are centralized.
+ * - The overall logic remains simple (KISS) and avoids code duplication (DRY).
+ *
+ * @package App\Libs
  */
 class ModelLiteForm
 {
     /**
-     * @var array List of number types that should be rendered as input fields.
+     * List of number types rendered as input fields.
+     *
+     * @var array
      */
     protected static array $numberTypes = [
         'tinyint',
@@ -27,7 +38,9 @@ class ModelLiteForm
     ];
 
     /**
-     * @var array List of text types that should be rendered as textarea fields.
+     * List of text types rendered as textarea fields.
+     *
+     * @var array
      */
     protected static array $textTypes = [
         'text',
@@ -39,12 +52,16 @@ class ModelLiteForm
     ];
 
     /**
-     * @var array List of date types that should be rendered as input fields with type="date".
+     * List of date types rendered as date input fields.
+     *
+     * @var array
      */
     protected static array $dateTypes = ['date'];
 
     /**
-     * @var array List of date and time types that should be rendered as input fields with type="datetime".
+     * List of datetime types rendered as datetime-local input fields.
+     *
+     * @var array
      */
     protected static array $dateTimeTypes = ['datetime', 'timestamp'];
 
@@ -60,87 +77,109 @@ class ModelLiteForm
     }
 
     /**
-     * Generates an HTML form for a given model.
+     * Retrieves the model's value for a given field.
      *
-     * @param LiteRecord $model The model object for which the form is being created.
-     * @param string $action The action URL for the form submission. Defaults to current route if not provided.
-     * @return void
+     * @param object $model The model instance.
+     * @param string $field The field name.
+     * @return string The escaped field value, or an empty string if not set.
      */
-    public static function create(LiteRecord $model, string $action = ''): void
+    private static function getModelValue(object $model, string $field): string
     {
-        $model_name = get_class($model);
-
-        if ('' === $action) {
-            $action = ltrim(Router::get('route'), '/');
-        }
-
-        // Get the primary key and its value if set
-        $pk = $model_name::getPK();
-        $pkValue = isset($model->$pk) ? self::escape($model->$pk) : '';
-
-        echo '<form action="', PUBLIC_PATH, $action, '" method="post" id="', $model_name, '" class="scaffold">' . PHP_EOL;
-
-        if ($pkValue) {
-            echo '<input id="', $model_name, '_', $pk, '" name="', $model_name, '[', $pk, ']" value="', $pkValue, '" type="hidden">' . PHP_EOL;
-        }
-
-        // Get the fields
-        $fields = $model_name::metadata()->getFields();
-
-        // Remove the primary key field
-        unset($fields[$pk]);
-
-        foreach ($fields as $field => $meta) {
-            $type = $meta['Type'];
-            $alias = self::getFieldAlias($field);
-
-            $inputId = $model_name . '_' . $field;
-            $inputName = $model_name . '[' . $field . ']';
-
-            $isRequired = !$meta['Null'];
-            $requiredAttr = $isRequired ? 'required' : '';
-            $labelClass = $isRequired ? 'class="required"' : '';
-            $asterisk = $isRequired ? ' *' : '';
-
-            echo "<label {$labelClass}>{$alias}{$asterisk}" . PHP_EOL;
-
-            // Use isset to check if the property exists, otherwise use an empty string.
-            $value = isset($model->$field) ? self::escape($model->$field) : '';
-
-            if (str_ends_with($field, '_id')) {
-                $fieldValue = isset($model->$field) ? $model->$field : '';
-                echo Form::dbSelect(
-                    "{$model_name}.{$field}",
-                    null,
-                    null,
-                    'Select',
-                    '',
-                    $fieldValue
-                );
-                echo '</label>', PHP_EOL;
-                continue;
-            }
-
-            $inputHtml = self::getInput(
-                $type,
-                $value,
-                $inputId,
-                $inputName,
-                $requiredAttr
-            );
-            echo $inputHtml, PHP_EOL;
-            echo '</label>', PHP_EOL;
-        }
-
-        echo '<input type="submit" />', PHP_EOL;
-        echo '</form>', PHP_EOL;
+        return isset($model->$field) ? self::escape((string)$model->$field) : '';
     }
 
     /**
-     * Converts a field name to a human-readable alias.
+     * Generates the HTML for the complete form based on the model.
      *
-     * @param string $name The field name to convert.
-     * @return string The human-readable alias for the field.
+     * @param LiteRecord $model The model instance.
+     * @param string $action The form action URL.
+     * @return string The generated HTML form.
+     */
+    public static function create(LiteRecord $model, string $action = ''): string
+    {
+        $modelName = get_class($model);
+        if ('' === $action) {
+            $action = ltrim(Router::get('route'), '/');
+        }
+        $html = '';
+
+        // Start form
+        $html .= sprintf(
+            '<form action="%s%s" method="post" id="%s" class="scaffold">%s',
+            PUBLIC_PATH,
+            self::escape($action),
+            self::escape($modelName),
+            PHP_EOL
+        );
+
+        // Primary key field (hidden)
+        $pk = $modelName::getPK();
+        $pkValue = self::getModelValue($model, $pk);
+        if ($pkValue !== '') {
+            $html .= sprintf(
+                '<input id="%s_%s" name="%s[%s]" value="%s" type="hidden">%s',
+                $modelName, $pk, $modelName, $pk, $pkValue, PHP_EOL
+            );
+        }
+
+        // Retrieve fields metadata and remove the primary key field
+        $fields = $modelName::metadata()->getFields();
+        unset($fields[$pk]);
+
+        // Generate HTML for each field
+        foreach ($fields as $field => $meta) {
+            $html .= self::generateFieldHtml($model, $field, $meta, $modelName);
+        }
+
+        // Submit button and close form
+        $html .= sprintf('<input type="submit" />%s', PHP_EOL);
+        $html .= sprintf('</form>%s', PHP_EOL);
+
+        return $html;
+    }
+
+    /**
+     * Generates the HTML for a single form field (label and input).
+     *
+     * @param LiteRecord $model The model instance.
+     * @param string $field The field name.
+     * @param array $meta The field metadata.
+     * @param string $modelName The model class name.
+     * @return string The generated field HTML.
+     */
+    private static function generateFieldHtml(LiteRecord $model, string $field, array $meta, string $modelName): string
+    {
+        $alias = self::getFieldAlias($field);
+        $inputId = $modelName . '_' . $field;
+        $inputName = sprintf('%s[%s]', $modelName, $field);
+        $isRequired = !$meta['Null'];
+        $requiredAttr = $isRequired ? 'required' : '';
+        $labelClass = $isRequired ? ' class="required"' : '';
+        $asterisk = $isRequired ? ' *' : '';
+
+        $html = sprintf('<label%s>%s%s%s', $labelClass, $alias, $asterisk, PHP_EOL);
+
+        // If the field ends with '_id', use a database select
+        if (str_ends_with($field, '_id')) {
+            $fieldValue = $model->$field ?? '';
+            $html .= Form::dbSelect("{$modelName}.{$field}", null, null, 'Select', '', $fieldValue) . PHP_EOL;
+            $html .= '</label>' . PHP_EOL;
+            return $html;
+        }
+
+        // Generate input based on field type
+        $value = self::getModelValue($model, $field);
+        $html .= self::generateInputHtml($meta['Type'], $value, $inputId, $inputName, $requiredAttr) . PHP_EOL;
+        $html .= '</label>' . PHP_EOL;
+
+        return $html;
+    }
+
+    /**
+     * Converts a field name into a human-readable alias.
+     *
+     * @param string $name The original field name.
+     * @return string The alias.
      */
     private static function getFieldAlias(string $name): string
     {
@@ -148,96 +187,61 @@ class ModelLiteForm
     }
 
     /**
-     * Generates the appropriate input HTML based on the field type.
+     * Generates the HTML for an input element based on the field type.
      *
      * @param string $type The database field type.
-     * @param string $value The value of the field.
+     * @param string $value The field value.
      * @param string $inputId The id attribute for the input element.
      * @param string $inputName The name attribute for the input element.
-     * @param string $requiredAttr The required attribute for the input element.
-     * @return string The HTML input element as a string.
+     * @param string $requiredAttr The required attribute (if any).
+     * @return string The generated input HTML.
      */
-    private static function getInput(
+    private static function generateInputHtml(
         string $type,
         string $value,
         string $inputId,
         string $inputName,
         string $requiredAttr
     ): string {
-        if (in_array($type, static::$numberTypes, true)) {
-            $input = self::buildInputElement(
-                'number',
-                $inputId,
-                $inputName,
-                $value,
-                $requiredAttr
-            );
-        } elseif (in_array($type, static::$dateTypes, true)) {
-            $input = self::buildInputElement(
-                'date',
-                $inputId,
-                $inputName,
-                $value,
-                $requiredAttr
-            );
-        } elseif (in_array($type, static::$dateTimeTypes, true)) {
-            $input = self::buildInputElement(
-                'datetime-local',
-                $inputId,
-                $inputName,
-                $value,
-                $requiredAttr
-            );
+        if (in_array($type, self::$numberTypes, true)) {
+            $input = self::buildInputElement('number', $inputId, $inputName, $value, $requiredAttr);
+        } elseif (in_array($type, self::$dateTypes, true)) {
+            $input = self::buildInputElement('date', $inputId, $inputName, $value, $requiredAttr);
+        } elseif (in_array($type, self::$dateTimeTypes, true)) {
+            $input = self::buildInputElement('datetime-local', $inputId, $inputName, $value, $requiredAttr);
         } elseif (self::isSelectTypeMatched($type)) {
-            $input = self::buildSelectElement(
-                $inputId,
-                $inputName,
-                self::getEnumOptions($type),
-                $value,
-                $requiredAttr
-            );
-        } elseif (in_array($type, static::$textTypes, true)) {
-            $input = self::buildTextareaElement(
-                $inputId,
-                $inputName,
-                $requiredAttr,
-                $value
-            );
+            $input = self::buildSelectElement($inputId, $inputName, self::getEnumOptions($type), $value, $requiredAttr);
+        } elseif (in_array($type, self::$textTypes, true)) {
+            $input = self::buildTextareaElement($inputId, $inputName, $requiredAttr, $value);
         } else {
-            $input = self::buildInputElement(
-                'text',
-                $inputId,
-                $inputName,
-                $value,
-                $requiredAttr
-            );
+            $input = self::buildInputElement('text', $inputId, $inputName, $value, $requiredAttr);
         }
 
         return $input;
     }
 
     /**
-     * Determines if the given type string matches one of the specific types: 'enum', 'set', or 'bool'.
+     * Checks whether the given field type should be rendered as a select element.
      *
-     * @param string $type The type string to check.
-     * @return bool True if the type matches 'enum', 'set', or 'bool', false otherwise.
+     * @param string $type The field type.
+     * @return bool True if the type is enum, set, or bool.
      */
     private static function isSelectTypeMatched(string $type): bool
     {
         return str_starts_with($type, 'enum') ||
-            str_starts_with($type, 'set') ||
-            str_starts_with($type, 'bool');
+               str_starts_with($type, 'set') ||
+               str_starts_with($type, 'bool');
     }
 
     /**
      * Builds an HTML input element.
      *
-     * @param string $type The type attribute for input elements.
+     * @param string $type The input type.
      * @param string $id The id attribute.
      * @param string $name The name attribute.
      * @param string $value The value attribute.
-     * @param string $requiredAttr The required attribute.
-     * @return string The HTML element as a string.
+     * @param string $requiredAttr The required attribute (if applicable).
+     * @return string The HTML input element.
      */
     private static function buildInputElement(
         string $type,
@@ -246,14 +250,16 @@ class ModelLiteForm
         string $value = '',
         string $requiredAttr = ''
     ): string {
-        $attributesString = self::attributesToString([
-            'id' => $id,
-            'name' => $name,
-            'type' => $type,
+        $attributes = [
+            'id'    => $id,
+            'name'  => $name,
+            'type'  => $type,
             'value' => $value,
-            $requiredAttr => $requiredAttr,
-        ]);
-        return "<input {$attributesString}>";
+        ];
+        if ($requiredAttr !== '') {
+            $attributes[$requiredAttr] = $requiredAttr;
+        }
+        return sprintf('<input %s>', self::attributesToString($attributes));
     }
 
     /**
@@ -261,10 +267,9 @@ class ModelLiteForm
      *
      * @param string $id The id attribute.
      * @param string $name The name attribute.
-     * @param string $requiredAttr The required attribute.
-     * @param string $content The content for textarea elements.
-     *
-     * @return string The HTML element as a string.
+     * @param string $requiredAttr The required attribute (if applicable).
+     * @param string $content The textarea content.
+     * @return string The HTML textarea element.
      */
     private static function buildTextareaElement(
         string $id,
@@ -272,12 +277,14 @@ class ModelLiteForm
         string $requiredAttr = '',
         string $content = ''
     ): string {
-        $attributesString = self::attributesToString([
-            'id' => $id,
+        $attributes = [
+            'id'   => $id,
             'name' => $name,
-            $requiredAttr => $requiredAttr,
-        ]);
-        return "<textarea {$attributesString}>{$content}</textarea>";
+        ];
+        if ($requiredAttr !== '') {
+            $attributes[$requiredAttr] = $requiredAttr;
+        }
+        return sprintf('<textarea %s>%s</textarea>', self::attributesToString($attributes), $content);
     }
 
     /**
@@ -285,10 +292,10 @@ class ModelLiteForm
      *
      * @param string $id The id attribute.
      * @param string $name The name attribute.
-     * @param array $options The options for the select.
-     * @param string $selectedValue The selected value.
-     * @param string $requiredAttr The required attribute.
-     * @return string The HTML select element as a string.
+     * @param array $options The options for the select element.
+     * @param string $selectedValue The currently selected value.
+     * @param string $requiredAttr The required attribute (if applicable).
+     * @return string The HTML select element.
      */
     private static function buildSelectElement(
         string $id,
@@ -297,57 +304,52 @@ class ModelLiteForm
         string $selectedValue,
         string $requiredAttr
     ): string {
-        $attributesString = self::attributesToString([
-            'id' => $id,
+        $attributes = [
+            'id'   => $id,
             'name' => $name,
-            $requiredAttr => $requiredAttr,
-        ]);
-        $selectHtml = "<select {$attributesString}>" . PHP_EOL;
-        foreach ($options as $option) {
-            $selected = $option === $selectedValue ? ' selected' : '';
-            $optionEscaped = self::escape($option);
-            $selectHtml .= "<option value=\"{$optionEscaped}\"{$selected}>{$optionEscaped}</option>" . PHP_EOL;
+        ];
+        if ($requiredAttr !== '') {
+            $attributes[$requiredAttr] = $requiredAttr;
         }
-        $selectHtml .= '</select>';
-        return $selectHtml;
+        $html = sprintf('<select %s>', self::attributesToString($attributes)) . PHP_EOL;
+        foreach ($options as $option) {
+            $optionEscaped = self::escape($option);
+            $selected = ($option === $selectedValue) ? ' selected' : '';
+            $html .= sprintf('<option value="%s"%s>%s</option>', $optionEscaped, $selected, $optionEscaped) . PHP_EOL;
+        }
+        $html .= '</select>';
+        return $html;
     }
 
     /**
-     * Converts an array of attributes into a string for HTML tags.
+     * Converts an associative array of attributes into an HTML attributes string.
      *
      * @param array $attributes The attributes to convert.
-     * @return string The attributes as a string.
+     * @return string The resulting attributes string.
      */
     private static function attributesToString(array $attributes): string
     {
-        $attributePairs = array_map(
-            function ($key, $value) {
-                if ($value === '' || is_int($key)) {
-                    return '';
-                }
-                $escapedValue = self::escape($value);
-                return "{$key}=\"{$escapedValue}\"";
-            },
-            array_keys($attributes),
-            $attributes
-        );
-
-        return implode(' ', array_filter($attributePairs));
+        $parts = [];
+        foreach ($attributes as $key => $value) {
+            if ($value === '' || is_int($key)) {
+                continue;
+            }
+            $parts[] = sprintf('%s="%s"', $key, self::escape($value));
+        }
+        return implode(' ', $parts);
     }
 
     /**
-     * Extracts the options from an enum or set type definition.
+     * Extracts options from an enum or set type definition.
      *
      * @param string $typeDefinition The type definition string from the database.
      * @return array The list of options.
      */
     private static function getEnumOptions(string $typeDefinition): array
     {
-        preg_match('/^(enum|set)\((.*)\)$/', $typeDefinition, $matches);
-        if (!$matches) {
-            return [];
+        if (preg_match('/^(enum|set)\((.*)\)$/', $typeDefinition, $matches)) {
+            return str_getcsv($matches[2], ',', "'");
         }
-
-        return str_getcsv($matches[2], ',', "'");
+        return [];
     }
 }
