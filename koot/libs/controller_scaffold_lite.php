@@ -37,6 +37,7 @@ abstract class ControllerScaffoldLite extends ControllerAdmin
             $obj = new $this->model;
             // Try to save the user
             if (!$obj->create(Input::post($this->model))) {
+                Flash::error(_('Something was wrong'));
                 // If it fails the data is persistent in the form
                 $this->{$this->model} = $obj;
                 return;
