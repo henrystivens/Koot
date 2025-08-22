@@ -1,0 +1,23 @@
+<?php View::content() ?>
+<div class="container" style="max-width: 500px;">
+    <h2><?= isset($user->id) ? 'Edit User' : 'Create User' ?></h2>
+    <?= Form::open("admin/users/" . (isset($user->id) ? "update/{$user->id}" : "create"), 'post', ['autocomplete' => 'off']) ?>
+
+    <?php if (isset($user->id)): ?>
+        <?= Form::hidden('id', '', $user->id) ?>
+    <?php endif; ?>
+
+    <label for="Users_email" class="required">Email *</label>
+    <?= Form::email('Users.email', 'required maxlength=255') ?>
+
+    <label for="Users_first_name">First Name</label>
+    <?= Form::text('Users.first_name', 'maxlength=255') ?>
+
+    <label for="Users_last_name">Last Name</label>
+    <?= Form::text('Users.last_name', 'maxlength=255') ?>
+
+    <button type="submit">
+        <?= isset($user->id) ? 'Update' : 'Create' ?>
+    </button>
+    <?= Form::close() ?>
+</div>
