@@ -1,0 +1,39 @@
+<h1>Manage Permissions</h1>
+<div>
+    <h2>Roles</h2>
+    <select id="role-select">
+        <option value="" disabled selected>Select a role</option>
+        <?php foreach ($roles as $role): ?>
+            <option value="<?= htmlspecialchars($role->id) ?>" data-role-name="<?= htmlspecialchars($role->name) ?>">
+                <?= htmlspecialchars($role->name) ?>
+            </option>
+        <?php endforeach; ?>
+    </select>
+</div>
+<div id="permissions-container">
+    <h2 id="permissions-title">Permissions</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Resource</th>
+                <th>Permission</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($resources as $resource): ?>
+                <?php $checkboxId = 'perm_' . (int)$resource->id; ?>
+                <tr>
+                    <td>
+                        <label for="<?= htmlspecialchars($checkboxId) ?>">
+                            <?= htmlspecialchars($resource->name) ?>
+                        </label>
+                    </td>
+                    <td>
+                        <input type="checkbox" class="permission-checkbox" id="<?= htmlspecialchars($checkboxId) ?>" data-resource-id="<?= htmlspecialchars($resource->id) ?>">
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>
+<script src="/javascript/permissions.js"></script>

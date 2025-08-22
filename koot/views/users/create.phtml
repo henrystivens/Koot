@@ -1,0 +1,29 @@
+<?php
+/**
+ * View: users/create.phtml (KumbiaPHP)
+ * Form for creating/editing users (ignores password and status fields)
+ * Uses KumbiaPHP Html/Form helpers and Pico/Koot CSS classes
+ */
+?>
+<div class="container" style="max-width: 500px;">
+    <h2><?= isset($user->id) ? 'Edit User' : 'Create User' ?></h2>
+    <?= Form::open("users/" . (isset($user->id) ? "update/{$user->id}" : "create"), 'post', ['autocomplete' => 'off']) ?>
+
+    <?php if (isset($user->id)): ?>
+        <?= Form::hidden('id', '', $user->id) ?>
+    <?php endif; ?>
+
+    <label for="users_email" class="required">Email *</label>
+    <?= Form::email('email', 'required maxlength=255') ?>
+
+    <label for="users_first_name">First Name</label>
+    <?= Form::text('first_name', 'maxlength=255') ?>
+
+    <label for="users_last_name">Last Name</label>
+    <?= Form::text('last_name', 'maxlength=255') ?>
+
+    <button type="submit">
+        <?= isset($user->id) ? 'Update' : 'Create' ?>
+    </button>
+    <?= Form::close() ?>
+</div>
