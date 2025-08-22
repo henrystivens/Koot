@@ -6,6 +6,11 @@
 class Users extends LiteRecord
 {
     /**
+     * @var string The name of the table associated with the model.
+     */
+    protected static $table = 'users';
+
+    /**
      * Prepare the entity before it is created by setting the default status
      * and ensuring the email is unique.
      */
