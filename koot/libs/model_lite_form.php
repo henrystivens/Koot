@@ -97,7 +97,7 @@ class ModelLiteForm
      */
     public static function create(LiteRecord $model, string $action = ''): string
     {
-        $modelName = get_class($model);
+        $modelName = $model::class;
         if ('' === $action) {
             $action = ltrim(Router::get('route'), '/');
         }
